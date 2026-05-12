@@ -1,0 +1,16 @@
+# Environment variables
+.env
+
+# Node
+node_modules/
+dist/
+
+# .NET
+bin/
+obj/
+*.user
+
+# IDE
+.vs/
+.vscode/
+.idea/
