@@ -1,0 +1,128 @@
+name: Deploy to AWS ECS
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  AWS_REGION: eu-north-1
+  ECR_BACKEND: grievance-backend
+  ECR_FRONTEND: grievance-frontend
+  ECS_CLUSTER: grievance-cluster
+  ECS_BACKEND_SERVICE: grievance-backend-svc
+  ECS_FRONTEND_SERVICE: grievance-frontend-svc
+
+jobs:
+  build-and-deploy:
+    name: Build & Deploy
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login to Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image tag
+        id: vars
+        run: echo "IMAGE_TAG=$(echo $GITHUB_SHA | head -c 7)" >> $GITHUB_OUTPUT
+
+      # ─────────────────────────────────────────
+      # Build & Push Backend Image
+      # ─────────────────────────────────────────
+      - name: Build backend image
+        working-directory: ./backend
+        run: |
+          docker build \
+            -t ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_BACKEND }}:${{ steps.vars.outputs.IMAGE_TAG }} \
+            -t ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_BACKEND }}:latest \
+            .
+
+      - name: Push backend image
+        run: |
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_BACKEND }}:${{ steps.vars.outputs.IMAGE_TAG }}
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_BACKEND }}:latest
+
+      # ─────────────────────────────────────────
+      # Build & Push Frontend Image
+      # ─────────────────────────────────────────
+      - name: Get ALB DNS name
+        id: alb
+        run: |
+          ALB_DNS=$(aws elbv2 describe-load-balancers \
+            --names grievance-alb \
+            --query 'LoadBalancers[0].DNSName' \
+            --output text 2>/dev/null || echo "")
+          echo "ALB_DNS=$ALB_DNS" >> $GITHUB_OUTPUT
+
+      - name: Build frontend image
+        working-directory: ./frontend
+        run: |
+          VITE_API_URL=""
+          if [ -n "${{ steps.alb.outputs.ALB_DNS }}" ]; then
+            VITE_API_URL="http://${{ steps.alb.outputs.ALB_DNS }}"
+          fi
+          docker build \
+            --build-arg VITE_API_URL=$VITE_API_URL \
+            -t ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND }}:${{ steps.vars.outputs.IMAGE_TAG }} \
+            -t ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND }}:latest \
+            .
+
+      - name: Push frontend image
+        run: |
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND }}:${{ steps.vars.outputs.IMAGE_TAG }}
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND }}:latest
+
+      # ─────────────────────────────────────────
+      # Deploy to ECS
+      # ─────────────────────────────────────────
+      - name: Deploy backend to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_BACKEND_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Deploy frontend to ECS
+        run: |
+          aws ecs update-service \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --service ${{ env.ECS_FRONTEND_SERVICE }} \
+            --force-new-deployment \
+            --region ${{ env.AWS_REGION }}
+
+      - name: Wait for backend service stability
+        run: |
+          echo "Waiting for backend service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_BACKEND_SERVICE }} \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: Wait for frontend service stability
+        run: |
+          echo "Waiting for frontend service to stabilize..."
+          aws ecs wait services-stable \
+            --cluster ${{ env.ECS_CLUSTER }} \
+            --services ${{ env.ECS_FRONTEND_SERVICE }} \
+            --region ${{ env.AWS_REGION }} || true
+
+      - name: Deployment summary
+        run: |
+          echo "✅ Deployment complete!"
+          echo "Backend image:  ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_BACKEND }}:${{ steps.vars.outputs.IMAGE_TAG }}"
+          echo "Frontend image: ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_FRONTEND }}:${{ steps.vars.outputs.IMAGE_TAG }}"
+          if [ -n "${{ steps.alb.outputs.ALB_DNS }}" ]; then
+            echo "App URL: http://${{ steps.alb.outputs.ALB_DNS }}"
+          fi

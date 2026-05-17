@@ -10,7 +10,6 @@ FROM mcr.microsoft.com/dotnet/aspnet:8.0 AS final
 RUN apt-get update && apt-get install -y --no-install-recommends curl && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY --from=build /app/publish .
-# Render sets PORT env var automatically; fallback to 5000 for local Docker
-ENV ASPNETCORE_URLS=http://+:${PORT:-5000}
+ENV ASPNETCORE_URLS=http://+:5000
 EXPOSE 5000
 ENTRYPOINT ["dotnet", "GrievanceApi.dll"]
