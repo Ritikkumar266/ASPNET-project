@@ -54,6 +54,7 @@ public class ComplaintResponseDto
     public string? DepartmentId { get; set; }
     public string? DepartmentName { get; set; }
     public List<StatusHistoryDto> StatusHistory { get; set; } = new();
+    public List<string> ImageUrls { get; set; } = new();
     public DateTime CreatedAt { get; set; }
     public DateTime UpdatedAt { get; set; }
     public bool HasFeedback { get; set; }

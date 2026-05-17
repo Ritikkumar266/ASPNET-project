@@ -19,7 +19,7 @@ public class ComplaintService
         _feedbacks = database.GetCollection<Feedback>("feedbacks");
     }
 
-    public async Task<ComplaintResponseDto> CreateAsync(CreateComplaintDto dto, string citizenId, string citizenName)
+    public async Task<ComplaintResponseDto> CreateAsync(CreateComplaintDto dto, string citizenId, string citizenName, IFormFileCollection? images)
     {
         if (!Enum.TryParse<ComplaintPriority>(dto.Priority, true, out var priority))
             priority = ComplaintPriority.Medium;
@@ -82,6 +82,27 @@ public class ComplaintService
             DepartmentName = departmentName,
             StatusHistory = statusHistory
         };
+
+        // Process uploaded images (max 5, max 5MB each)
+        if (images != null && images.Count > 0)
+        {
+            var imageUrls = new List<string>();
+            foreach (var image in images.Take(5))
+            {
+                if (image.Length > 5 * 1024 * 1024)
+                    throw new Exception($"Image '{image.FileName}' exceeds 5MB limit");
+
+                var allowedTypes = new[] { "image/jpeg", "image/png", "image/gif", "image/webp" };
+                if (!allowedTypes.Contains(image.ContentType.ToLower()))
+                    throw new Exception($"Image '{image.FileName}' has unsupported format. Allowed: JPEG, PNG, GIF, WebP");
+
+                using var ms = new MemoryStream();
+                await image.CopyToAsync(ms);
+                var base64 = Convert.ToBase64String(ms.ToArray());
+                imageUrls.Add($"data:{image.ContentType};base64,{base64}");
+            }
+            complaint.ImageUrls = imageUrls;
+        }
 
         await _complaints.InsertOneAsync(complaint);
         return MapToDto(complaint, false);
@@ -225,7 +246,8 @@ public class ComplaintService
             }).ToList(),
             CreatedAt = c.CreatedAt,
             UpdatedAt = c.UpdatedAt,
-            HasFeedback = hasFeedback
+            HasFeedback = hasFeedback,
+            ImageUrls = c.ImageUrls ?? new List<string>()
         };
     }
 }

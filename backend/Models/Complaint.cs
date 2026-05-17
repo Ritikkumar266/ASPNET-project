@@ -90,6 +90,9 @@ public class Complaint
     [BsonElement("statusHistory")]
     public List<StatusHistoryEntry> StatusHistory { get; set; } = new();
 
+    [BsonElement("imageUrls")]
+    public List<string> ImageUrls { get; set; } = new();
+
     [BsonElement("createdAt")]
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

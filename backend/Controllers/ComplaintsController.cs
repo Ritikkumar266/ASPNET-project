@@ -20,13 +20,15 @@ public class ComplaintsController : ControllerBase
 
     [HttpPost]
     [Authorize(Roles = "Citizen")]
-    public async Task<IActionResult> Create([FromBody] CreateComplaintDto dto)
+    [RequestSizeLimit(30 * 1024 * 1024)] // 30MB max for images
+    public async Task<IActionResult> Create([FromForm] CreateComplaintDto dto)
     {
         try
         {
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value!;
             var userName = User.FindFirst(ClaimTypes.Name)?.Value!;
-            var result = await _complaintService.CreateAsync(dto, userId, userName);
+            var images = Request.Form.Files;
+            var result = await _complaintService.CreateAsync(dto, userId, userName, images);
             return Ok(result);
         }
         catch (Exception ex)

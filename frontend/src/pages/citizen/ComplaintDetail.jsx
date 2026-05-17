@@ -4,6 +4,7 @@ import api from '../../api/axios';
 import StatusBadge from '../../components/StatusBadge';
 import PriorityBadge from '../../components/PriorityBadge';
 import ComplaintTimeline from '../../components/ComplaintTimeline';
+import ImageGallery from '../../components/ImageGallery';
 import FeedbackForm from '../../components/FeedbackForm';
 import toast from 'react-hot-toast';
 import { HiStar } from 'react-icons/hi2';
@@ -71,6 +72,8 @@ export default function CitizenComplaintDetail() {
           )}
         </div>
       </div>
+
+      <ImageGallery images={complaint.imageUrls} />
 
       <div className="glass-card" style={{ marginBottom: 'var(--space-xl)' }}>
         <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-lg)' }}>Status Timeline</h3>

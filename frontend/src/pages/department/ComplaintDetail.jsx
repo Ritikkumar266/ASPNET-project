@@ -4,6 +4,7 @@ import api from '../../api/axios';
 import StatusBadge from '../../components/StatusBadge';
 import PriorityBadge from '../../components/PriorityBadge';
 import ComplaintTimeline from '../../components/ComplaintTimeline';
+import ImageGallery from '../../components/ImageGallery';
 import toast from 'react-hot-toast';
 
 const DEPT_STATUSES = ['InProgress', 'Resolved', 'Rejected'];
@@ -59,6 +60,7 @@ export default function DeptComplaintDetail() {
             <h4 style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: 'var(--space-md)' }}>Description</h4>
             <p style={{ fontSize: '0.9rem', lineHeight: 1.7 }}>{complaint.description}</p>
           </div>
+          <ImageGallery images={complaint.imageUrls} />
           <div className="glass-card">
             <h3 style={{ fontSize: '1rem', fontWeight: 600, marginBottom: 'var(--space-lg)' }}>Status Timeline</h3>
             <ComplaintTimeline history={complaint.statusHistory} />
